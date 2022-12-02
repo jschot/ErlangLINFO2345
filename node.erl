@@ -1,31 +1,37 @@
 -module(node).
--export([start/0, stop/0, init/0, nodem/3, showtable/0]).
+-export([start/3, createnode/1, init/1, rps/3]).
 
-start() ->
-    register(node, spawn(node, init, [])).
+start(N, L, V) ->
+    C = 0,
+    if
+        C == N ->
+            io:fwrite("All node created~n"),
+            Globalvar = ets:new(x, []),
+            ets:insert(Globalvar, {l, L}),
+            ets:insert(Globalvar, {v, V});
+        true ->
+            createnode(list_to_atom(integer_to_list(N))),
+            start(N-1,L)
+    end.
 
-init() ->
-    nodem([],[],[]).
+createnode(ID) ->
+    register(ID, spawn(node, init, [ID])).
 
-stop() ->
-    node ! stop,
-    unregister(node).
+init(ID) ->
+    rps(ID,[],[]).
 
-showtable() ->
-    node ! showtable.
-
-nodem(Name, Table, Ages) ->
+rps(ID, Table, Ages) ->
     Ages = [X+1||{_,X} <- Ages],
     receive
         {request, From, Entries} ->
-            io:format("received ~w ", [Entries]),
+            io:format("received ~w~n ", [Entries]),
             NewTable = Table ++ From,
             NewAges = Ages ++ [0],
-            nodem(Name, NewTable, NewAges);
+            rps(ID, NewTable, NewAges);
         showtable ->
-            io:format("table ~w~n", [Table]),
+            io:format("Table ~w~n", [Table]),
             io:format("Age ~w~n", [Ages]),
-            nodem(Name, Table, Ages);
+            rps(ID, Table, Ages);
         stop ->
             io:format("closing down~n", []),
             ok
