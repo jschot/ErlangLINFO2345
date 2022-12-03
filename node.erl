@@ -1,5 +1,5 @@
 -module(node).
--export([start/3, start/1, createnode/1, init/1, rps/3]).
+-export([start/3, start/1, createnode/1, init/1, rps/2]).
 
 start(N, L, V) ->
     ets:new(x, [set,public,named_table]),
@@ -27,22 +27,19 @@ init(ID) ->
     [{_, N}] = N1,
     [{_, V}] = V1,
 
-    Table = [list_to_atom(integer_to_list(rand:uniform(N))) || _ <- lists:seq(1, V)],
-    Ages = [0 || _ <- lists:seq(1, V)],
-    rps(ID,Table,Ages).
+    Table = [{list_to_atom(integer_to_list(rand:uniform(N))),0} || _ <- lists:seq(1, V)],
+    rps(ID,Table).
 
-rps(ID, Table, Ages) ->
-    AgesInc = [X+1||X <- Ages],
+rps(ID, Table) ->
+    TableInc = [{Node,X+1}||{Node,X} <- Table],
     receive
         {request, From, Entries} ->
             io:format("received ~w~n ", [Entries]),
-            NewTable = Table ++ From,
-            NewAges = AgesInc ++ [0],
-            rps(ID, NewTable, NewAges);
+            NewTable = TableInc ++ {From,0},
+            rps(ID, NewTable);
         showtable ->
-            io:format("Table ~w~n", [Table]),
-            io:format("Age ~w~n", [AgesInc]),
-            rps(ID, Table, AgesInc);
+            io:format("Table ~w~n", [TableInc]),
+            rps(ID, TableInc);
         stop ->
             io:format("closing down~n", []),
             ok
