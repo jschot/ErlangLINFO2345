@@ -1,4 +1,5 @@
 -module(node).
+-import(lists,[max/1]).
 -export([start/3, start/1, createnode/1, init/1, rps/2]).
 
 start(N, L, V) ->
@@ -27,19 +28,31 @@ init(ID) ->
     [{_, N}] = N1,
     [{_, V}] = V1,
 
-    Table = [{list_to_atom(integer_to_list(rand:uniform(N))),0} || _ <- lists:seq(1, V)],
+    Table = [{0,list_to_atom(integer_to_list(rand:uniform(N)))} || _ <- lists:seq(1, V)],
     rps(ID,Table).
 
 rps(ID, Table) ->
-    TableInc = [{Node,X+1}||{Node,X} <- Table],
+    %Increase Age by one
+    TableInc = [{Age+1,Node}||{Age,Node} <- Table],
+    %Select older node (Q)
+    {AgeQ,Q} = max(TableInc),
+    %Select l-1 other random entries of the table
+    [{_,L}] = ets:lookup(x, l),
+    ShuffledT = [Y||{_,Y} <- lists:sort([ {rand:uniform(), N} || N <- TableInc])],
+    io:format("Table ~w~n", [ShuffledT]),
+    REntries = lists:sublist(ShuffledT, L-1),
+    io:format("Table ~w~n", [REntries]),
+    %Reset to zero the age of Q
+    Table2 = lists:delete({AgeQ,Q}, TableInc),
+    TableOK = Table2 ++ [{0,Q}],
     receive
-        {request, From, Entries} ->
+        {avdertise, From, Entries} ->
             io:format("received ~w~n ", [Entries]),
-            NewTable = TableInc ++ {From,0},
+            NewTable = TableOK ++ [{From,0}],
             rps(ID, NewTable);
         showtable ->
-            io:format("Table ~w~n", [TableInc]),
-            rps(ID, TableInc);
+            io:format("Table ~w~n", [TableOK]),
+            rps(ID, TableOK);
         stop ->
             io:format("closing down~n", []),
             ok
