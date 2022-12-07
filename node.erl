@@ -1,12 +1,15 @@
 -module(node).
 -import(lists,[max/1]).
--export([start/3, start/1, createnode/1, init/1, rps/2]).
+-export([start/3, start/1, createnode/1, init/1, rps/1, rcv/1, stop/1]).
 
 start(N, L, V) ->
     ets:new(x, [set,public,named_table]),
     ets:insert(x, {n, N}),
     ets:insert(x, {l, L}),
     ets:insert(x, {v, V}),
+    {ok, File} = file:open("discoveryrate.csv", [write]),
+    file:write(File, io_lib:format("~p,~p\n", ["ID", "Table"])),
+    ets:insert(x, {file, File}),
     start(N).
 
 start(N) ->
@@ -19,6 +22,18 @@ start(N) ->
             start(N-1)
     end.
 
+stop(N) ->
+    C = 0,
+    if
+        C == N ->
+            [{_,File}] = ets:lookup(x, file),
+            file:close(File),
+            io:fwrite("All node shutted down~n");
+        true ->
+            list_to_atom(integer_to_list(N)) ! stop,
+            stop(N-1)
+    end.
+
 createnode(ID) ->
     register(ID, spawn(node, init, [ID])).
 
@@ -28,31 +43,83 @@ init(ID) ->
     [{_, N}] = N1,
     [{_, V}] = V1,
 
-    Table = [{0,list_to_atom(integer_to_list(rand:uniform(N)))} || _ <- lists:seq(1, V)],
-    rps(ID,Table).
+    Table = lists:usort(lists:delete({0,ID},[{0,list_to_atom(integer_to_list(rand:uniform(N)))} || _ <- lists:seq(1, V)])),
+    io:format("Init Table ~w : ~w~n ", [ID, Table]),
+    ets:insert(x, {ID, Table}),
+    timer:apply_interval(5000, node, rps, [ID]),
+    rcv(ID).
 
-rps(ID, Table) ->
+discovery(ID, Table) ->
+    [{_,File}] = ets:lookup(x, file),
+    T = [Y||{_,Y} <- Table],
+    file:write(File, io_lib:format("~p,\"~p\"\n", [atom_to_list(ID), T])).
+
+
+rps(ID) ->
+    [{_,Table}] = ets:lookup(x, ID),
     %Increase Age by one
     TableInc = [{Age+1,Node}||{Age,Node} <- Table],
     %Select older node (Q)
     {AgeQ,Q} = max(TableInc),
     %Select l-1 other random entries of the table
     [{_,L}] = ets:lookup(x, l),
-    ShuffledT = [Y||{_,Y} <- lists:sort([ {rand:uniform(), N} || N <- TableInc])],
-    io:format("Table ~w~n", [ShuffledT]),
+    ShuffledT = [Y||{_,Y} <- lists:sort([{rand:uniform(), N} || N <- TableInc])],
     REntries = lists:sublist(ShuffledT, L-1),
-    io:format("Table ~w~n", [REntries]),
     %Reset to zero the age of Q
     Table2 = lists:delete({AgeQ,Q}, TableInc),
     TableOK = Table2 ++ [{0,Q}],
+    ets:insert(x, {ID, TableOK}),
+    io:format("Table ~w : ~w~n ", [ID, TableOK]),
+    discovery(ID, TableOK),
+    %Send the l-1 entries to Q
+    Q ! {advertise, ID, REntries}.
+
+rcv(ID) ->
     receive
-        {avdertise, From, Entries} ->
-            io:format("received ~w~n ", [Entries]),
-            NewTable = TableOK ++ [{From,0}],
-            rps(ID, NewTable);
+        {advertise, From, Entries} ->
+            [{_,TableOK}] = ets:lookup(x, ID),
+            [{_,L}] = ets:lookup(x, l),
+            %Q sends back a subset of the l-1 entry of its table
+            ShuffledT2 = [Y||{_,Y} <- lists:sort([ {rand:uniform(), N} || {_,N} <- TableOK])],
+            REntries2 = lists:sublist(ShuffledT2, L-1),
+            From ! {response, Entries, REntries2},
+            rcv(ID);
+        {response, SendedPrvsly, Entries} ->
+            %Remove entries pointing to P from the subset send by Q
+            EntriesWoP = lists:delete(ID, Entries),
+            %Remove already present entries in P's view from the subset send by Q
+            [{_,TableOK}] = ets:lookup(x, ID),
+            TableEntriesP = [Y||{_,Y} <- TableOK],
+            EntriesQ = EntriesWoP -- TableEntriesP,
+            %Update P's view with the remaining entries commencing by empty entries of P and after by replacing entries sent to Q.
+            %Each new entry is set with an age of zero.
+            EntriesToAdd = [{0,Y}||Y <- EntriesQ],
+            NewTable = TableOK ++ EntriesToAdd,
+            [{_,V}] = ets:lookup(x, v),
+            if 
+                length(NewTable)-V > 0 ->
+                    io:format("Before table ~w : ~w~n ", [ID,NewTable]),
+                    io:format("SendedPrvvsly ~w : ~w~n ", [ID,SendedPrvsly]),
+                    TodeleteinNT = lists:usort([{Age,Y}||{Age,Y}<-NewTable, {_,X}<-SendedPrvsly , X==Y]),
+                    NewTable2 = NewTable -- TodeleteinNT,
+                    if
+                        V-length(NewTable2) > 0 ->
+                            NewTable3 = NewTable2 ++ lists:sublist(SendedPrvsly, V-length(NewTable2)),
+                            ets:insert(x, {ID, NewTable3}),
+                            io:format("UpdatedTable cas1 ~w : ~w~n ", [ID,NewTable3]);
+                        true ->
+                            ets:insert(x, {ID, NewTable2}),
+                            io:format("UpdatedTable cas2 ~w : ~w~n ", [ID,NewTable2])
+                    end;
+                true ->
+                    ets:insert(x, {ID, NewTable}),
+                    io:format("UpdatedTable cas3 ~w : ~w~n ", [ID,NewTable])
+            end,
+            rcv(ID);
         showtable ->
+            [{_,TableOK}] = ets:lookup(x, ID),
             io:format("Table ~w~n", [TableOK]),
-            rps(ID, TableOK);
+            rcv(ID);
         stop ->
             io:format("closing down~n", []),
             ok
