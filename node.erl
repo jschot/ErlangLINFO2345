@@ -8,7 +8,7 @@ start(N, L, V) ->
     ets:insert(x, {l, L}),
     ets:insert(x, {v, V}),
     {ok, File} = file:open("discoveryrate.csv", [write]),
-    file:write(File, io_lib:format("~p,~p\n", ["ID", "Table"])),
+    io:fwrite(File, "~p,~p~n", ["ID", "Table"]),
     ets:insert(x, {file, File}),
     start(N).
 
@@ -44,7 +44,6 @@ init(ID) ->
     [{_, V}] = V1,
 
     Table = lists:usort(lists:delete({0,ID},[{0,list_to_atom(integer_to_list(rand:uniform(N)))} || _ <- lists:seq(1, V)])),
-    io:format("Init Table ~w : ~w~n ", [ID, Table]),
     ets:insert(x, {ID, Table}),
     timer:apply_interval(5000, node, rps, [ID]),
     rcv(ID).
@@ -52,7 +51,7 @@ init(ID) ->
 discovery(ID, Table) ->
     [{_,File}] = ets:lookup(x, file),
     T = [Y||{_,Y} <- Table],
-    file:write(File, io_lib:format("~p,\"~p\"\n", [atom_to_list(ID), T])).
+    io:fwrite(File, "~p,\"~p\"~n", [atom_to_list(ID), T]).
 
 
 rps(ID) ->
@@ -69,7 +68,6 @@ rps(ID) ->
     Table2 = lists:delete({AgeQ,Q}, TableInc),
     TableOK = Table2 ++ [{0,Q}],
     ets:insert(x, {ID, TableOK}),
-    io:format("Table ~w : ~w~n ", [ID, TableOK]),
     discovery(ID, TableOK),
     %Send the l-1 entries to Q
     Q ! {advertise, ID, REntries}.
@@ -98,22 +96,17 @@ rcv(ID) ->
             [{_,V}] = ets:lookup(x, v),
             if 
                 length(NewTable)-V > 0 ->
-                    io:format("Before table ~w : ~w~n ", [ID,NewTable]),
-                    io:format("SendedPrvvsly ~w : ~w~n ", [ID,SendedPrvsly]),
                     TodeleteinNT = lists:usort([{Age,Y}||{Age,Y}<-NewTable, {_,X}<-SendedPrvsly , X==Y]),
                     NewTable2 = NewTable -- TodeleteinNT,
                     if
                         V-length(NewTable2) > 0 ->
                             NewTable3 = NewTable2 ++ lists:sublist(SendedPrvsly, V-length(NewTable2)),
-                            ets:insert(x, {ID, NewTable3}),
-                            io:format("UpdatedTable cas1 ~w : ~w~n ", [ID,NewTable3]);
+                            ets:insert(x, {ID, NewTable3});
                         true ->
-                            ets:insert(x, {ID, NewTable2}),
-                            io:format("UpdatedTable cas2 ~w : ~w~n ", [ID,NewTable2])
+                            ets:insert(x, {ID, NewTable2})
                     end;
                 true ->
-                    ets:insert(x, {ID, NewTable}),
-                    io:format("UpdatedTable cas3 ~w : ~w~n ", [ID,NewTable])
+                    ets:insert(x, {ID, NewTable})
             end,
             rcv(ID);
         showtable ->
