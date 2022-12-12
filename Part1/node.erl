@@ -1,6 +1,24 @@
 -module(node).
 -import(server,[discovery/2, exitchurn/3, churnhelper/2]).
--export([start/1, init/1, rps/1, rpswithdiscovery/1, rcv/1, stop/1, initformeasure/1]).
+-export([start/1, start/3, init/1, rps/1, rpswithdiscovery/1, rcv/1, stop/1, initformeasure/1]).
+
+start(N, L, V) ->
+    ets:new(x, [set,public,named_table]),
+    ets:insert(x, {n, N}),
+    ets:insert(x, {l, L}),
+    ets:insert(x, {v, V}),
+    ets:insert(x, {existingn, []}),
+    startmany(N).
+
+startmany(N) ->
+    C = 0,
+    if
+        C == N ->
+            io:fwrite("All node created~n");
+        true ->
+            createnode(list_to_atom(integer_to_list(N))),
+            startmany(N-1)
+    end.
 
 start(N) ->
     createnode(list_to_atom(integer_to_list(N))),
@@ -10,12 +28,7 @@ stop(N) ->
     C = 0,
     if
         C == N ->
-            [{_,FileD}] = ets:lookup(x, filed),
-            file:close(FileD),
-            [{_,FileC}] = ets:lookup(x, filec),
-            file:close(FileC),
-            [{_,FileC2}] = ets:lookup(x, filec2),
-            file:close(FileC2),
+            timer:sleep(1000),
             ets:delete(x),
             io:fwrite("All node shutted down~n");
         true ->
