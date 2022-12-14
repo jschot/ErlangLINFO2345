@@ -1,5 +1,5 @@
-f = open("discoveryrate1000-50-100.csv", "r")
-fw = open("discoveryrate1000_50_100.csv", "w+")
+f = open("discoveryrate100-10-20.csv", "r")
+fw = open("discoveryrate100_10_20.csv", "w+")
 
 data = f.read()
 isList = False

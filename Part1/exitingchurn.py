@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
-df = pd.read_csv("ExitChurn1000-50-100.csv")
+df = pd.read_csv("Churn.csv")
 
 L = []
 x = []
