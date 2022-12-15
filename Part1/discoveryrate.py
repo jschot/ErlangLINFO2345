@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
-df = pd.read_csv("discoveryrate1000_50_100.csv")
+df = pd.read_csv("discoveryrate100_10_20.csv")
 
 turn = dict()
 discoverednodes = dict()
@@ -32,7 +32,7 @@ for i, row in df.iterrows() :
         discoverednodes[row.ID][turn[row.ID]] = set(row.Table.replace("[", "").replace("]", "").split(","))
 
 for i in discoverednodes.keys() :
-    print("Noeud {} :  {}N - {}% en {} turn".format(i,len(discoverednodes[i][turn[i]]),(len(discoverednodes[i][turn[i]])/1000)*100,turn[i]))
+    print("Noeud {} :  {}N - {}% en {} turn".format(i,len(discoverednodes[i][turn[i]]),(len(discoverednodes[i][turn[i]])/100)*100,turn[i]))
 print(Max)
 # x axis values
 x = []
@@ -47,7 +47,7 @@ for i in range(1,max(turn.values())):
     for j in range(1,max(turn.keys())) :
         if turn[j] >= i :
             cnt += 1
-            sum += (len(discoverednodes[j][i])/1000)*100
+            sum += (len(discoverednodes[j][i])/100)*100
     avg = sum/cnt
     y.append(avg)
 
