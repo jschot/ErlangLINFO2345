@@ -51,11 +51,11 @@ def plot_resilience_graph():
         data[label]["y"].append(round(get_percentage(os.path.join(FOLDER, file)), 2))
     for label, d in data.items():
         plt.scatter(d["x"], d["y"], label=label)
-    plt.title("Resiliance plot")
+    plt.title("RPS resilience plot")
     plt.ylabel("Proportion of Byzantine samples (%)")
     plt.xlabel("Byzantine Proportion (%)")
     plt.legend(title="Parameters")
     plt.grid()
-    plt.savefig("resiliance.pdf")
+    plt.savefig("resilience.pdf")
     plt.show()
 plot_resilience_graph()
