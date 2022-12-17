@@ -1,11 +1,11 @@
 -module(node).
--import(server,[discovery/2, exitchurn/3, churnhelper/2]).
+-import(server,[getTimeSleep/0, discovery/2, exitchurn/3, churnhelper/2]).
 -export([start/1, start/3, init/1, rps/1, rpswithdiscovery/1, rcv/1, stop/1, initformeasure/1]).
 
 start(N, L, V) ->
     ets:new(x, [set,public,named_table]),
     ets:insert(x, {n, N}),
-    ets:insert(x, {l, L }),
+    ets:insert(x, {l, L}),
     ets:insert(x, {v, V}),
     ets:insert(x, {existingn, []}),
     startmany(N).
@@ -52,7 +52,7 @@ init(ID) ->
     ShuffledT = [Y||{_,Y} <- lists:sort([{rand:uniform(), X} || X <- T])],
     Table = lists:sublist(ShuffledT, V),
     ets:insert(x, {ID, Table}),
-    timer:apply_interval(5000, node, rps, [ID]),
+    timer:apply_interval(getTimeSleep(), node, rps, [ID]),
     rcv(ID).
 
 initformeasure(ID) ->
@@ -65,7 +65,7 @@ initformeasure(ID) ->
     ShuffledT = [Y||{_,Y} <- lists:sort([{rand:uniform(), X} || X <- T])],
     Table = lists:sublist(ShuffledT, V),
     ets:insert(x, {ID, Table}),
-    timer:apply_interval(5000, node, rpswithdiscovery, [ID]),
+    timer:apply_interval(getTimeSleep(), node, rpswithdiscovery, [ID]),
     rcv(ID).
 
 rps(ID) ->
@@ -87,9 +87,9 @@ rps(ID) ->
 
 rpswithdiscovery(ID) ->
     [{_,Table}] = ets:lookup(x, ID),
-    io:fwrite("NODE   View of ~w : ~w~n", [ID, Table]),
     %Increase Age by one
     TableInc = [{Age+1,Node}||{Age,Node} <- Table],
+    io:fwrite("TABLE : ~w~n", [TableInc]),
     %Select older node (Q)
     {AgeQ,Q} = lists:max(TableInc),
     %Select l-1 other random entries of the table
@@ -102,13 +102,11 @@ rpswithdiscovery(ID) ->
     ets:insert(x, {ID, TableOK}),
     discovery(ID, TableOK),
     %Send the l-1 entries to Q
-    io:fwrite("NODE   ~w advertised ~w~n", [ID, REntries]),
     Q ! {advertise, ID, REntries}.
 
 rcv(ID) ->
     receive
         {advertise, From, Entries} ->
-            % io:fwrite("Received by ~w : ~w~n", [ID, Entries]),
             %Remove entries pointing to Q from the subset send by P
             EntriesWoAge = [Y||{_,Y} <- Entries],
             EntriesWoP = lists:delete(ID, EntriesWoAge),

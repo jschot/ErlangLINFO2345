@@ -1,5 +1,5 @@
 -module(biznode).
--import(server,[discovery/2, exitchurn/3, churnhelper/2]).
+-import(server,[getTimeSleep/0, discovery/2, exitchurn/3, churnhelper/2]).
 -export([byzrps/1, rcv/1, initbiz/1]).
 
 initbiz(ID) ->
@@ -13,7 +13,7 @@ initbiz(ID) ->
     % ShuffledT = [Y||{_,Y} <- lists:sort([{rand:uniform(), X} || X <- T])],
     % Table = lists:sublist(ShuffledT, V),
     % ets:insert(x, {ID, Table}),
-    timer:apply_interval(5000, biznode, byzrps, [ID]),
+    timer:apply_interval(getTimeSleep(), biznode, byzrps, [ID]),
     rcv(ID).
 
 byzrps(ID) ->
@@ -27,8 +27,7 @@ byzrps(ID) ->
     ShuffledT = [Y||{_,Y} <- lists:sort([{rand:uniform(), N} || N <- BizNodes])],
     REntries = lists:sublist(ShuffledT, L-1) ++ [ID],
     %Send the l-1 entries to Q
-    Q ! {advertise, ID, [{0, Node} || Node <-REntries]},
-    io:fwrite("BIZNODE ~w advertised to ~w : ~w~n", [ID, Q, REntries]).
+    Q ! {advertise, ID, [{0, Node} || Node <-REntries]}.
 
 rcv(ID) ->
     receive

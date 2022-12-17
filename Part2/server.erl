@@ -1,10 +1,22 @@
 -module(server).
 -import(node, [initformeasure/1]).
 -import(biznode, [initbiz/1]).
--export([flemme/0, start/3, startmany/1, enteringchurn/1, enteringchurn/3, startexitchurn/1, churnhelper/2, exitchurn/3, discovery/2, startwithbyzantine/4]).
+-export([getTimeSleep/0, startmetrics/6, flemme/0, start/3, startmany/1, enteringchurn/1, enteringchurn/3, startexitchurn/1, churnhelper/2, exitchurn/3, discovery/2, startwithbyzantine/4]).
+
+getTimeSleep() -> 1000.
 
 flemme() ->
     startwithbyzantine(10, 2, 2, 2).
+
+startmetrics(TotalNumberOfNodes, L, V, ByzNodes, Inc, MaxByzNodes) ->
+    if  ByzNodes =< MaxByzNodes ->
+        io:fwrite("Running with ~w Byz ~n", [ByzNodes]),
+        startwithbyzantine(TotalNumberOfNodes-ByzNodes, L, V, ByzNodes),
+        startmetrics(TotalNumberOfNodes, L, V, ByzNodes+Inc, Inc, MaxByzNodes);
+        true ->
+            io:fwrite("Finished ~w ~w ~n", [ByzNodes, MaxByzNodes]),
+            ok
+    end.
 
 start(N, L, V) ->
     ets:new(x, [set,public,named_table]),
@@ -30,7 +42,16 @@ startwithbyzantine(N, L, V, B) -> % B = Number of byzantine nodes
     ets:insert(x, {v, V}),
     ets:new(b, [set,public,named_table]),
     ets:insert(b, {b, B}),
-    {ok, FileDiscovery} = file:open("discoveryrate.csv", [write]),
+    OutputFile = string:concat("data/discoveryrate_", 
+        string:concat(integer_to_list(N),
+        string:concat("_",
+        string:concat(integer_to_list(L),
+        string:concat("_",
+        string:concat(integer_to_list(V),
+        string:concat("_", 
+        string:concat(integer_to_list(B), ".csv")))
+    ))))),
+    {ok, FileDiscovery} = file:open(OutputFile, [write]),
     {ok, FileChurn} = file:open("Churn.csv", [write]),
     {ok, FileChurn2} = file:open("Churn2.csv", [write]),
     io:fwrite(FileDiscovery, "~p,~p~n", ["ID", "Table"]),
@@ -42,7 +63,33 @@ startwithbyzantine(N, L, V, B) -> % B = Number of byzantine nodes
     ets:insert(x, {existingn, []}),
     ets:insert(b, {biznodes, []}),
     startmany(N),
-    startmanybiz(B, N).
+    startmanybiz(B, N),
+    show_round(0).
+
+show_round(C) ->
+    MAX_ROUNDS=80,
+    if C > MAX_ROUNDS ->
+        [{_, N}] = ets:lookup(x, n),
+        [{_, B}] = ets:lookup(b, b),
+        stopall(N+B);
+        true ->
+            io:fwrite("Round : ~w~n", [C]),
+            timer:sleep(getTimeSleep()),
+            show_round(C + 1)
+    end.
+
+stopall(T) ->
+    C = 0,
+    if
+        C == T ->
+            timer:sleep(1000),
+            ets:delete(x),
+            ets:delete(b),
+            io:fwrite("All node shutted down~n");
+        true ->
+            list_to_atom(integer_to_list(T)) ! stop,
+            stopall(T-1)
+    end.
 
 startmanybiz(B, N) ->
     if 
@@ -118,7 +165,7 @@ exitchurn(ID, C, List) ->
                     ets:insert(x, {existingn,ExistingNodes--[ID]}),
                     io:format("closing down Node ~p~n", [ID]),
                     ok
-                after 5000 ->
+                after getTimeSleep() ->
                     io:format("~p,~p,~p~n", [atom_to_list(ID), length(List),length(T2)]),
                     exitchurn(ID,C+1,List)
             end
