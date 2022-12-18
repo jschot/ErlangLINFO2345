@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
-df = pd.read_csv("discoveryrate100_10_20.csv")
+df = pd.read_csv("discoveryrate.csv")
 
 turn = dict()
 discoverednodes = dict()
