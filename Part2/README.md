@@ -18,3 +18,11 @@ server:startwithbyzantine(N, L, V, B).
 
 server:startmetrics(TotalNumberOfNodes, L, V, ByzNodes, Inc, MaxByzNodes)
 ```
+
+## Make graph
+
+Just run : (you must have the matplotblib librairie)
+
+```bash
+python3 percentage_byz_in_nodes.py
+```

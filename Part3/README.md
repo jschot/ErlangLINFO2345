@@ -1,4 +1,4 @@
-# PART2 - Byantine nodes
+# PART3 - Byantine nodes
 
 ## How to launch
 
@@ -18,4 +18,12 @@ server:startwithbyzantineandrandom(N, L, V, B, R).
 % from ByzNodes to MaxByzNodes by incremanting of Inc
 
 server:startmetrics(TotalNumberOfNodes, L, V, ByzNodes, Inc, MaxByzNodes, R)
+```
+
+## Make graph
+
+Just run : (you must have the matplotblib librairie)
+
+```bash
+python3 percentage_byz_in_nodes.py
 ```
